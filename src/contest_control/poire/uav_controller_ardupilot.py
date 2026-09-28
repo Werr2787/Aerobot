@@ -11,10 +11,10 @@ from sensor_msgs.msg import LaserScan
 
 # Ограничения движения и настройки локального обхода по данным лидара.
 NAV_SPEED_M_S = 0.5  # Максимальная скорость навигации, м/с.
-OBSTACLE_STOP_DISTANCE_M = 1.0  # Дистанция до препятствия, при которой нужен обход.
+OBSTACLE_STOP_DISTANCE_M = 2.5  # Заранее начинаем выбирать свободный проход.
 OBSTACLE_SECTOR_HALF_ANGLE_RAD = math.radians(20.0)  # Полуширина сектора проверки пути.
-DETOUR_STEP_M = 1.2  # Длина одного бокового шага обхода, м.
-DETOUR_MIN_CLEARANCE_M = 2.0  # Требуемый свободный просвет в выбранном направлении, м.
+DETOUR_STEP_M = 2.0  # Длина waypoint в направлении выбранного просвета, м.
+DETOUR_MIN_CLEARANCE_M = 1.5  # Минимальная дальность стены в проверяемом секторе, м.
 DETOUR_ANGLE_STEP_RAD = math.radians(10.0)  # Шаг перебора углов для поиска прохода.
 OBSTACLE_MARGIN_M = 0.5  # Запас сверх длины короткой цели обхода, м.
 MAX_DETOUR_STEPS = 40  # Максимальное число обходных шагов за один вызов goto().
@@ -300,8 +300,8 @@ class UavControllerArduPilot(Node):
             clearance = self._clearance_at_bearing(bearing)  # Измеренный просвет по этому углу.
             if clearance < DETOUR_MIN_CLEARANCE_M:
                 continue
-            # Сначала предпочитаем направление к цели, затем более широкий просвет.
-            score = 3.0 * math.cos(offset) + 0.15 * min(clearance, 8.0)  # Оценка направления и ширины просвета.
+            # Ширина свободного прохода важнее небольшого отклонения от цели.
+            score = 1.5 * math.cos(offset) + 0.5 * min(clearance, 8.0)
             candidates.append((score, bearing))
 
         if not candidates:
@@ -455,7 +455,8 @@ class UavControllerArduPilot(Node):
                     self.get_logger().error("Лимит обходных шагов достигнут.")
                     return False
 
-                detour_target = self._choose_detour_target(*goal)  # Свободная промежуточная точка по лидарному скану.
+                # Если уже обходим, ищем продолжение этого же курса, не прыгая назад к исходной цели.
+                detour_target = self._choose_detour_target(*active_target)
                 if detour_target is None:
                     self.set_setpoint_target(
                         self.pose.pose.position.x,
