@@ -12,20 +12,20 @@ from sensor_msgs.msg import LaserScan
 # Ограничения движения и настройки локального обхода по данным лидара.
 NAV_SPEED_M_S = 0.5  # Максимальная скорость навигации, м/с.
 SLOW_NAV_SPEED_M_S = 0.25  # Сниженная скорость при проходе узких мест (проёмов).
-OBSTACLE_STOP_DISTANCE_M = 1.25  # Заранее начинаем выбирать свободный проход.
+OBSTACLE_STOP_DISTANCE_M = 2.5  # Заранее начинаем выбирать свободный проход.
 OBSTACLE_SECTOR_HALF_ANGLE_RAD = math.radians(8.0)  # Узкий сектор: рамка проёма сбоку не должна считаться препятствием.
 DETOUR_STEP_M = 1.0  # Длина waypoint в направлении выбранного просвета, м.
-DETOUR_MIN_CLEARANCE_M = 1.0  # Минимальная дальность стены в проверяемом секторе, м.
-DETOUR_ANGLE_STEP_RAD = math.radians(20.0)  # Шаг перебора углов для поиска прохода.10.0
+DETOUR_MIN_CLEARANCE_M = 1.5  # Минимальная дальность стены в проверяемом секторе, м.
+DETOUR_ANGLE_STEP_RAD = math.radians(5.0)  # Шаг перебора углов для поиска прохода.10.0
 OBSTACLE_MARGIN_M = 0.5  # Запас сверх длины короткой цели обхода, м.
-MAX_DETOUR_STEPS = 10000000000  # Максимальное число обходных шагов за один вызов goto().
+MAX_DETOUR_STEPS = 40  # Максимальное число обходных шагов за один вызов goto().
 
 # --- Безопасность прохода узких мест (дверных проёмов) ---
-DRONE_RADIUS_M = 0.6  # Физический радиус дрона с запасом (корпус + пропеллеры).
+DRONE_RADIUS_M = 0.45  # Физический радиус дрона с запасом (корпус + пропеллеры).
 MIN_SAFE_CLEARANCE_M = max(0.9, DRONE_RADIUS_M * 2.2)  # Нижний порог требуемого зазора — не даём ему падать ниже этого значения у самой цели.
 DOORWAY_CENTERING_RANGE_M = 1.0  # На этой дистанции от цели включаем центрирование между стенами проёма.
-CENTERING_SIDE_MIN_ANGLE_RAD = math.radians(1.0)  # Боковой сектор начинается здесь (не считаем сам проём стеной).
-CENTERING_SIDE_MAX_ANGLE_RAD = math.radians(360.0)  # ...и заканчивается здесь.
+CENTERING_SIDE_MIN_ANGLE_RAD = math.radians(15.0)  # Боковой сектор начинается здесь (не считаем сам проём стеной).
+CENTERING_SIDE_MAX_ANGLE_RAD = math.radians(70.0)  # ...и заканчивается здесь.
 CENTERING_GAIN = 0.5  # Доля разницы (право - лево) зазоров, на которую сдвигаем цель вбок.
 CENTERING_MAX_OFFSET_M = 0.6  # Ограничение максимального бокового сдвига за один шаг.
 
@@ -569,10 +569,10 @@ class UavControllerArduPilot(Node):
 
                 active_target = detour_target  # Направляем дрон к выбранной точке обхода.
                 detour_steps += 1  # Учитываем шаг для ограничения бесконечного обхода.
-                # self.get_logger().warn(
-                #     f"Объезжаю препятствие: шаг {detour_steps}, "
-                #     f"просвет впереди {obstacle_distance:.2f} м."
-                # )
+                self.get_logger().warn(
+                    f"Объезжаю препятствие: шаг {detour_steps}, "
+                    f"просвет впереди {obstacle_distance:.2f} м."
+                )
                 continue
 
             dx = self.pose.pose.position.x - goal[0]  # Ошибка конечной позиции по X.

@@ -2,7 +2,7 @@ import rclpy
 from uav_controller_ardupilot import UavControllerArduPilot
 
 # Точка зависания и время удержания — подставьте значения вашего полигона
-HOVER_POINT = (1.0, 0.0, 2.0)
+HOVER_POINT = (5.0, 11.0, 2.0)
 HOLD_SECONDS = 10.0
 
 
