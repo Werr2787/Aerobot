@@ -74,7 +74,14 @@
             <static>true</static>
             <pose>0 12.5 0 0 0 0</pose>
         </include>
-        
+<!--  -->
+        <include>
+            <name>task0_red_circle</name>
+            <uri>model://figure_circle_red</uri>
+            <static>true</static>
+            <pose>0.52 7.56 0.18 0 0 0</pose>
+        </include>
+   <!--  -->
         <include>
             <name>wall1</name>
             <uri>model://house_scene_2_wall_1</uri>

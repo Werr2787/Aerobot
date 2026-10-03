@@ -194,6 +194,14 @@ class UavControllerArduPilot(Node):
     # ---------- команды FCU ----------
 
     def set_mode(self, mode, timeout=10.0):
+        # Do not send a mode request until MAVROS reports an FCU connection.
+        if not self.spin_until(lambda: self.state.connected, timeout=timeout):
+            self.get_logger().error(
+                f"Cannot set mode {mode}: FCU is not connected "
+                f"(current mode: {self.state.mode or 'unknown'})."
+            )
+            return False
+
         # Сначала отправляем запрос MAVROS, затем подтверждаем смену по /state.
         while not self.mode_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("Waiting for set_mode service...")
@@ -201,12 +209,40 @@ class UavControllerArduPilot(Node):
         req.custom_mode = mode  # Требуемый режим, например GUIDED или LAND.
         future = self.mode_cli.call_async(req)  # Асинхронный ответ сервиса.
         rclpy.spin_until_future_complete(self, future, timeout_sec=timeout)
-        if future.result() is None or not future.result().mode_sent:
-            self.get_logger().error(f"set_mode({mode}) FAILED")
+        if not future.done():
+            self.get_logger().error(
+                f"set_mode({mode}) timed out waiting for MAVROS response "
+                f"(FCU connected: {self.state.connected}, current mode: "
+                f"{self.state.mode or 'unknown'})."
+            )
+            return False
+
+        try:
+            result = future.result()
+        except Exception as exc:
+            self.get_logger().error(f"set_mode({mode}) service call raised: {exc}")
+            return False
+
+        if result is None:
+            self.get_logger().error(f"set_mode({mode}) returned no response.")
+            return False
+        if not result.mode_sent:
+            recent_status = "; ".join(self.last_statustexts[-3:]) or "none received"
+            self.get_logger().error(
+                f"MAVROS rejected set_mode({mode}) (FCU connected: "
+                f"{self.state.connected}, current mode: "
+                f"{self.state.mode or 'unknown'}, recent FCU status: "
+                f"{recent_status})."
+            )
             return False
         ok = self.spin_until(lambda: self.state.mode == mode, timeout=timeout)  # Подтверждение режима через State.
         if not ok:
-            self.get_logger().error(f"set_mode({mode}) sent but FCU did not switch")
+            recent_status = "; ".join(self.last_statustexts[-3:]) or "none received"
+            self.get_logger().error(
+                f"set_mode({mode}) was sent but FCU did not switch "
+                f"(current mode: {self.state.mode or 'unknown'}, "
+                f"recent FCU status: {recent_status})."
+            )
         return ok
 
     def set_navigation_speed(self, speed_m_s=NAV_SPEED_M_S, timeout=5.0):
@@ -569,10 +605,10 @@ class UavControllerArduPilot(Node):
 
                 active_target = detour_target  # Направляем дрон к выбранной точке обхода.
                 detour_steps += 1  # Учитываем шаг для ограничения бесконечного обхода.
-                # self.get_logger().warn(
-                #     f"Объезжаю препятствие: шаг {detour_steps}, "
-                #     f"просвет впереди {obstacle_distance:.2f} м."
-                # )
+                self.get_logger().warn(
+                    f"Объезжаю препятствие: шаг {detour_steps}, "
+                    f"просвет впереди {obstacle_distance:.2f} м."
+                )
                 continue
 
             dx = self.pose.pose.position.x - goal[0]  # Ошибка конечной позиции по X.
